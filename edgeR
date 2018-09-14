@@ -1,0 +1,48 @@
+source("https://bioconductor.org/biocLite.R")
+biocLite("edgeR")
+biocLite("limma")
+library(edgeR)
+library(limma)
+
+x <- read.delim ("aml_R_vs_N_readcount.txt",check.names=FALSE, stringsAsFactors=FALSE)
+x <- read.delim ("aml_R_vs_D_readcount_a.txt",check.names=FALSE, stringsAsFactors=FALSE)
+head(x)
+
+Patient <-factor(c(27,27,8,8,16,16))
+Tissue <-factor(c ("R","D","R","D","R","D"))
+design <- model.matrix(~Patient+Tissue)
+rownames(design) <- colnames(y)
+design
+y <- estimateDisp(y, design, robust=TRUE)
+y$common.dispersion
+
+
+group <- c("Relapse","Diagnosis","Relapse","Diagnosis","Relapse","Diagnosis")
+y <- DGEList(counts=x[,2:7], genes=x[,1], group=group)
+design <- model.matrix(~Patient+Tissue)
+y$samples
+
+keep <- rowSums(cpm(y)>1) >= 0
+y <- y[keep, , keep.lib.sizes=FALSE]
+y <- calcNormFactors(y)
+y$samples
+
+y <- estimateDisp(y,design)
+
+fit <- glmQLFit(y,design)
+qlf <- glmQLFTest(fit)
+topTags(qlf)
+fit <- glmFit(y,design)
+lrt <- glmLRT(fit)
+topTags(lrt)
+summary(decideTests(lrt))
+
+et <- exactTest(y)
+decideTestsDGE(et, adjust.method="BH", p.value=0.05, lfc=2)
+topTags(et)
+summary(decideTests(et))
+plotMDS(y)
+
+#Write plot MD
+plotMD(et,main="Relapse vs. Remission")
+abline(h=c(-2, 2), col="blue")
